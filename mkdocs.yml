@@ -1,0 +1,19 @@
+site_name: MT5/Telegram Trading Bot Docs
+site_url: !
+site_description: Dokumentation für den MT5/Telegram Trading Bot
+
+av:
+  - Home: index.md
+  - Trading-Grundlagen: trading_basics.md
+  - Konfiguration: config.md
+
+theme:
+  name: material
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences 

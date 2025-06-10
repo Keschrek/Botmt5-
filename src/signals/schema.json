@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["buy", "sell"]
+    },
+    "volume": {
+      "type": "number"
+    },
+    "price": {
+      "type": "number"
+    },
+    "tp": {
+      "type": "number"
+    },
+    "sl": {
+      "type": "number"
+    },
+    "comment": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "symbol",
+    "action",
+    "volume",
+    "price"
+  ]
+} 

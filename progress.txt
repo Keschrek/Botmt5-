@@ -1,0 +1,46 @@
+## Projekt Fortschritt: MT5/Telegram Trading Bot
+
+Dies ist eine automatische Fortschritts-Dokumentation des KI-Assistenten. Sie wird regelmäßig aktualisiert, um den aktuellen Stand des Projekts, fertiggestellte Komponenten und ausstehende Aufgaben festzuhalten.
+
+**Datum/Zeit der letzten Aktualisierung:** [Wird vom Assistenten aktualisiert]
+
+---
+
+**Fertiggestellte Komponenten:**
+
+1.  **Projektstruktur:** Grundlegende Verzeichnisstruktur und Standarddateien (.gitignore, README.md, requirements.txt) sind vorhanden.
+2.  **Konfiguration:** Grundlegende `config.yaml` und `schema.json` sind erstellt.
+3.  **Basis-Modules:**
+    *   `logger_setup.py`: Funktion zur Konfiguration des Loggings.
+    *   `mt5_client.py`: Klasse für MT5-Verbindung, Datenabruf, Orderausführung und Symbolinformationen. Inklusive Reconnect-Logik in `get_rates`.
+    *   `telegram_handler.py`: Grundlegende Klasse zur Signalverarbeitung und Befehlsannahme (`/start`, `/test`, `/status`). Integriert mit `MT5Client`, `Watchdog` und `LiveTrading` für den `/status`-Befehl. Enthält jetzt Command-Handler für diese Befehle und eine `run`-Methode zum Starten des Pollings. Die `is_authorized` Methode ist implementiert. Der `/status`-Befehl wurde erweitert. Die Integration des `/test`-Befehls mit dem `Backtester` wurde überprüft und ist auf Code-Ebene implementiert.
+    *   `watchdog.py`: Grundlegende Klasse zur Überwachung von MT5-Verbindung und Aktivität. Integriert mit `MT5Client`. **Die vollständige Überwachungslogik (Verbindung, Aktivität, Saldo) ist implementiert, einschließlich detaillierterer Telegram-Alarmmeldungen und Protokollierung. Erste Unit-Tests für Lag-Prüfungen und Liveness wurden implementiert.**
+    *   `snapshot_helper.py`: Grundlegende Klasse zum Speichern von Matplotlib-Snapshots. **Die Plotting-Logik ist implementiert, einschließlich Plotting von Indikatoren auf einer sekundären Achse und optionaler Hervorhebung von Signalen. Methode zum Plotten der Equity-Kurve hinzugefügt.**
+4.  **Handelslogik:**
+    *   `live_trading.py`: **Problem beim Bearbeiten/Neuerstellen.** Der letzte bekannte korrekte Zustand enthielt die Logik für Datenabruf, Indikatorberechnung, Regelbewertung, Positionsgrößen- und Risikomanagement sowie Orderausführung und berücksichtigte den Konfidenz-Score vom `OnlineLearner`. Integration des `SnapshotHelper`s in dieser Datei ist *nicht* abgeschlossen und kann aufgrund des Bearbeitungsproblems nicht fortgesetzt werden. Die Datei kann derzeit nicht zuverlässig bearbeitet werden.
+    *   `backtester.py`: Klasse für das Backtesting, inklusive Datenladen, -aufbereitung, Indikatorberechnung, Strategieanwendung und Simulationslauf mit Performance-Metriken. Die `run_backtest_command`-Methode für Telegram-Integration ist implementiert. **Die `run_grid_search`-Methode zur Durchführung von Parameter-Grid-Searches ist implementiert.** **Logik zum Formatieren und Speichern von Backtest-Ergebnissen (Metriken, Trades, Equity Curve) wurde hinzugefügt, und die relevanten Methoden (`run_backtest_simulation`, `run_backtest_command`, `run_grid_search`) wurden angepasst. Integration des SnapshotHelper für Equity-Kurven-Plots ist implementiert.**
+5.  **Machine Learning:**
+    *   `online_learner.py`: **Die Feature-Extraktionslogik in `extract_features` und `extract_features_for_prediction` wurde implementiert.** Platzhalter für Trainings- und Update-Logik. Aktualisierung der Initialisierungslogik des River-Modells versucht, stieß aber auf Bearbeitungsprobleme. **Zusätzliche Metriken (F1-Score, LogLoss) wurden zur Nachverfolgung der Modell-Performance in `process_trade_feedback` hinzugefügt.**
+6.  **Skripte:** Grundlegende PowerShell-Skripte im `scripts/`-Verzeichnis.
+7.  **Hauptausführungsskript (`run_bot.py`):** Lädt die Konfiguration, richtet das Logging ein, initialisiert alle Kernmodule und optionalen Module (`OnlineLearner`, `SnapshotHelper`, falls aktiviert), startet Live-Trading-Threads oder führt Backtesting aus (mit CLI-Argumenten für Symbol, Datum, Zeitrahmen) basierend auf dem übergebenen Modus (`live` oder `test`). Der Telegram-Handler wird nun nach Initialisierung der anderen Module erstellt, erhält deren Instanzen und sein Thread wird gestartet.
+8.  **Dokumentation:** **MkDocs-Grundstruktur (`mkdocs.yml`) erstellt und eine neue Seite (`trading_basics.md`) mit umfassenden Informationen zu Trading-Grundlagen, Indikatoren, Strategie-Design und Backtesting-Best-Practices hinzugefügt. Der Build-Skript (`scripts/build-docs.ps1`) wurde überprüft und die `README.md` wurde aktualisiert, um auf die Dokumentation zu verweisen.**
+
+---
+
+**Noch ausstehende Aufgaben:**
+
+1.  **Problem mit `src/live/live_trading.py` beheben:** Die Datei kann derzeit nicht zuverlässig bearbeitet oder neu erstellt werden. Dies muss manuell oder durch Klärung des Problems behoben werden, bevor Aufgaben, die diese Datei betreffen, fortgesetzt werden können.
+2.  **ML-Modul (`online_learner.py`):** Implementierung der Trainingslogik (Feedbackverarbeitung) und der Modell-Update-Logik. **Unit-Tests für die Feature-Extraktionsmethoden in `tests/test_online_learner.py` wurden hinzugefügt, inklusive Skizzen für Integrationstests.** Implementierung der Adaptiven Lernrate, Drift-Detection und Online-Validierung kann in Betracht gezogen werden.
+3.  **Watchdog-Modul (`watchdog.py`):** Implementierung der vollständigen Überwachungslogik (z.B. Benachrichtigungen bei Verbindungsproblemen, Inaktivität, kritischen Kontoständen) und Integration mit dem `TelegramHandler` zum Senden von Warnungen. -> **Punkt als abgeschlossen markiert, da die Tests nun implementiert sind.**
+4.  **Integration des Snapshot-Helpers:** Integration des `SnapshotHelper`s in `live_trading.py` (dies hängt von der Behebung des Problems mit `live_trading.py` ab).
+5.  **Live Trading (`live_trading.py`):** Verfeinerung der Handelsausführungslogik (z.g. Umgang mit Teilausführungen, Order-Modifikationen), Implementierung einer robusteren Bar-Completion-Erkennung im `run`-Loop, Implementierung der Telegram-Signalverarbeitung, falls Trades auch direkt per Telegram-Signal ausgelöst werden sollen (diese Punkte hängen von der Behebung des Problems mit `live_trading.py` ab).
+6.  **Testabdeckung:** Implementierung detaillierterer Unit- und Integrationstests in den Dateien im `tests/`-Verzeichnis. **Spezifisch für Watchdog stehen noch Tests für Edge Cases und Threading aus.** **Diese Tests wurden nun implementiert.** **Tests für Konfigurationsmodul (`test_config.py`) sind noch unvollständig/fehlerhaft.**
+7.  **Fehlerbehandlung und Robustheit:** Durchgängige Überprüfung und Verbesserung der Fehlerbehandlung in allen Modulen, Hinzufügen von Retry-Mechanismen bei API-Aufrufen, etc.
+8.  **Konfigurationsschema:** Vervollständigung des `schema.json` zur vollständigen Validierung der `config.yaml`.
+9.  **Deployment/Betrieb:** Überlegungen und Implementierung von Skripten/Prozessen für Deployment, Monitoring im laufenden Betrieb (z.B. externe Überwachung, Systemd-Services).
+
+---
+
+**Nächster geplanter Schritt:**
+
+Da das Problem mit `src/live/live_trading.py` weiterhin besteht und blockiert, wird der Fokus auf andere unabhängige Aufgaben gelegt. Nächster Schritt könnte die Implementierung weiterer Tests (außerhalb von LiveTrading und dem fehlerhaften Konfigurationsmodultest) oder die Verbesserung der Fehlerbehandlung sein. **Entscheidung steht aus.** 

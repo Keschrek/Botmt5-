@@ -1,0 +1,229 @@
+{
+  "type": "object",
+  "properties": {
+    "telegram": {
+      "type": "object",
+      "properties": {
+        "api_id": {
+          "type": "integer"
+        },
+        "api_hash": {
+          "type": "string"
+        },
+        "chat_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "api_id",
+        "api_hash",
+        "chat_id"
+      ]
+    },
+    "mt5": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "integer"
+        },
+        "server": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "account",
+        "server",
+        "password",
+        "symbols"
+      ]
+    },
+    "indicators": {
+      "type": "object",
+      "properties": {
+        "ema_periods": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "rsi_period": {
+          "type": "integer"
+        },
+        "macd": {
+          "type": "object",
+          "properties": {
+            "fast": {
+              "type": "integer"
+            },
+            "slow": {
+              "type": "integer"
+            },
+            "signal": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "fast",
+            "slow",
+            "signal"
+          ]
+        },
+        "bollinger": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "integer"
+            },
+            "sigma": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "period",
+            "sigma"
+          ]
+        },
+        "atr_period": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ema_periods",
+        "rsi_period",
+        "macd",
+        "bollinger",
+        "atr_period"
+      ]
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "tp_as_pips": {
+          "type": "boolean"
+        },
+        "sl_as_pips": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tp_as_pips",
+        "sl_as_pips"
+      ]
+    },
+    "risk": {
+      "type": "object",
+      "properties": {
+        "risk_per_trade_pct": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "risk_per_trade_pct"
+      ]
+    },
+    "backtest": {
+      "type": "object",
+      "properties": {
+        "commission_per_lot": {
+          "type": "number"
+        },
+        "slippage_pips": {
+          "type": "number"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "fill_missing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "commission_per_lot",
+        "slippage_pips",
+        "timezone",
+        "fill_missing"
+      ]
+    },
+    "ml": {
+      "type": "object",
+      "properties": {
+        "hyperparameters": {
+          "type": "object",
+          "properties": {
+            "learning_rate": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "learning_rate"
+          ]
+        }
+      },
+      "required": [
+        "hyperparameters"
+      ]
+    },
+    "logs": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "snapshots_dir": {
+          "type": "string"
+        },
+        "max_bytes": {
+          "type": "integer"
+        },
+        "backup_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "snapshots_dir",
+        "max_bytes",
+        "backup_count"
+      ]
+    },
+    "watchdog": {
+      "type": "object",
+      "properties": {
+        "check_interval_secs": {
+          "type": "integer"
+        },
+        "telegram_max_lag_secs": {
+          "type": "integer"
+        },
+        "mt5_max_lag_secs": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check_interval_secs",
+        "telegram_max_lag_secs",
+        "mt5_max_lag_secs"
+      ]
+    }
+  },
+  "required": [
+    "telegram",
+    "mt5",
+    "indicators",
+    "order",
+    "risk",
+    "backtest",
+    "ml",
+    "logs",
+    "watchdog"
+  ]
+} 
