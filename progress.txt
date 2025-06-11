@@ -43,4 +43,157 @@ Dies ist eine automatische Fortschritts-Dokumentation des KI-Assistenten. Sie wi
 
 **Nächster geplanter Schritt:**
 
-Da das Problem mit `src/live/live_trading.py` weiterhin besteht und blockiert, wird der Fokus auf andere unabhängige Aufgaben gelegt. Nächster Schritt könnte die Implementierung weiterer Tests (außerhalb von LiveTrading und dem fehlerhaften Konfigurationsmodultest) oder die Verbesserung der Fehlerbehandlung sein. **Entscheidung steht aus.** 
+Da das Problem mit `src/live/live_trading.py` weiterhin besteht und blockiert, wird der Fokus auf andere unabhängige Aufgaben gelegt. Nächster Schritt könnte die Implementierung weiterer Tests (außerhalb von LiveTrading und dem fehlerhaften Konfigurationsmodultest) oder die Verbesserung der Fehlerbehandlung sein. **Entscheidung steht aus.**
+
+---
+
+**[NEU: Architekturplanung und Implementierungsschritte für den vollautomatischen XAUUSD-Handelsbot]**
+
+**Datum/Zeit der Aktualisierung:** [Wird vom Assistenten aktualisiert]
+
+### 1. Blockaden in `live_trading.py`
+- **Problem:** Die Datei `src/live/live_trading.py` kann aktuell nicht zuverlässig bearbeitet oder neu erstellt werden. Die Integration neuer Features (z.B. SnapshotHelper, Telegram-Signalverarbeitung) ist dadurch blockiert. Die Hauptlogik für Datenabruf, Indikatorberechnung, Regelbewertung, Positionsgrößen- und Risikomanagement sowie Orderausführung ist grundsätzlich vorhanden, aber Erweiterungen und Refaktorierungen sind erschwert.
+- **Lösungsvorschläge:**
+  - Refaktorierung in kleinere, testbare Methoden (z.B. Auslagerung der Indikatorberechnung und Regelbewertung in eigene Module/Klassen).
+  - Klare Trennung von Datenabruf, Signalbewertung, Trade-Ausführung und Feedback-Loop.
+  - Temporäre Sicherung des aktuellen Stands und schrittweise Integration neuer Komponenten (z.B. Strategie- und Wissensmodule, Telegram-Evaluator).
+  - Testweise Implementierung eines Minimal-Modus: Einfache Buy/Sell-Order für XAUUSD zur Funktionsprüfung.
+
+### 2. Strategie-Modul für Indikatoren und XAUUSD
+- **Geplant:** Neue Klasse `XAUUSDStrategy` (in `src/strategies/xauusd_strategy.py`), zuständig für die Berechnung und Aggregation der Hauptindikatoren (EMA, RSI, MACD, Bollinger-Bänder, ATR) für XAUUSD.
+- **Parameter:**
+  - EMA: Perioden (z.B. 8, 21)
+  - RSI: Periode (z.B. 14)
+  - MACD: Fast/Slow/Signal (z.B. 12/26/9)
+  - Bollinger: Periode/Sigma (z.B. 20/2)
+  - ATR: Periode (z.B. 14)
+- **Input:** Historische Kursdaten (DataFrame mit OHLCV)
+- **Output:** DataFrame mit Indikatorwerten
+- **Einbindung:**
+  - Datenfluss: MT5Client → XAUUSDStrategy (Indikatorberechnung) → LiveTrading/Backtester → Signalbewertung
+  - Visualisierung: Datenabruf → Indikatorberechnung → Bereitstellung für SnapshotHelper
+
+### 3. Integration des Trading-Grundwissens
+- **Konzepte & Integration:**
+  - Kerzenformationen/Price Action: Erkennung typischer Muster (z.B. Hammer, Engulfing) als Filter für Signale
+  - Marktstruktur: Analyse von Hochs/Tiefs, Trenddefinition als Kontext für Signalbewertung
+  - Support/Resistance: Prüfung, ob Einstieg/TP/SL an relevanten Preisleveln liegen
+  - Trendlinien/Kanäle: Trendrichtung als Filter für Signalrichtung
+  - Volatilitätsanalyse: ATR + weitere Metriken zur Einschätzung der Marktdynamik
+  - Psychologische Preislevel: Filter für Einstiege an runden Zahlen
+  - Strategietypen: Einordnung des Signals (Trendfolge, Reversal, Breakout)
+  - Risikomanagement: Positionsgrößenberechnung, Risiko pro Trade/Konto
+- **Platzierung:** Neues Modul `src/strategies/trading_knowledge.py` (bzw. `src/analysis/market_context.py`), das regelbasierte Checks und Kontextanalysen bereitstellt. Aufrufbar aus LiveTrading, Telegram-Evaluator und Backtester.
+
+### 4. Telegram-Signalverarbeitung
+- **Neues Modul:** `src/signals/telegram_evaluator.py`
+- **Funktionalität:**
+  - Parsing von Telegram-Nachrichten (Symbol, Richtung, Einstieg, TP, SL)
+  - Validierung: Abgleich mit Indikatorwerten, Trading-Grundwissen, aktuellem Marktpreis
+  - Bewertung: Klassifizierung als "GOOD", "MEDIUM", "BAD" mit Begründung
+  - Schnittstelle: `evaluate_telegram_signal(signal, current_market_data, indicator_data, trading_knowledge_context) -> SignalRating`
+- **Einbindung:** Aufrufbar aus LiveTrading und TelegramHandler, Rückmeldung an User bei "MEDIUM"/"BAD".
+
+### 5. Anbindung des Online-Learners
+- **Erweiterung:**
+  - Nach jedem Trade (TP/SL) werden relevante Daten (Einstieg, TP, SL, Indikatorwerte, Signalbewertung, Ergebnis) an den OnlineLearner übergeben.
+  - Feedback-Mechanismus: JSON/Dict-Struktur mit allen Trade- und Kontextdaten.
+  - Lernprozess: Anpassung der Gewichtung von Indikator-Konstellationen und Regelchecks basierend auf Trade-Ergebnissen.
+
+### 6. Architekturübersicht (Stand/Plan)
+
+```
+run_bot.py
+│
+├── src/mt5/mt5_client.py (Datenabruf, Orderausführung)
+├── src/live/live_trading.py (Handelsschleife, Trade-Logik)
+│    ├── src/strategies/xauusd_strategy.py (Indikatorberechnung)
+│    ├── src/strategies/trading_knowledge.py (Regelbasierte Checks)
+│    ├── src/signals/telegram_evaluator.py (Telegram-Signalbewertung)
+│    └── src/ml/online_learner.py (Lernmodul)
+├── src/signals/telegram_handler.py (Empfang Telegram-Signale)
+├── src/logging/snapshot_helper.py (Visualisierung)
+└── ...
+```
+
+### 7. Geplante/neue Module
+- `src/strategies/xauusd_strategy.py`: Indikatorberechnung und Strategie-Logik für XAUUSD
+- `src/strategies/trading_knowledge.py`: Regelbasierte Checks für Trading-Grundwissen
+- `src/signals/telegram_evaluator.py`: Parsing, Validierung und Bewertung von Telegram-Signalen
+- Erweiterung `src/ml/online_learner.py`: Feedback-Mechanismus und Lernlogik
+
+**Offene Fragen/Annahmen:**
+- Annahme: Telegram-Signale enthalten Symbol, Richtung, Einstieg, TP, SL in klarer Textform (z.B. "BUY XAUUSD @ 2300.00 TP 2310.00 SL 2295.00").
+- Bewertungskriterien für "GOOD", "MEDIUM", "BAD" werden initial anhand Indikator- und Regelchecks festgelegt, können aber durch Online-Learning dynamisch angepasst werden.
+
+---
+
+**[Update: Architektur- und Modul-Refaktorisierung für XAUUSD-Bot]**
+
+1. **Refaktorisierung live_trading.py:**
+   - Probleme: Monolithische Struktur, fehlende Modularität, Integration neuer Features blockiert.
+   - Lösung: Aufteilung in fetch_data(), calculate_indicators(), evaluate_signals(), execute_trade(). Minimal-Modus: Buy-Order für XAUUSD nach Initialisierung.
+
+2. **Strategie-Modul XAUUSD:**
+   - src/strategies/xauusd_strategy.py mit Klasse XAUUSDStrategy, Methoden für EMA, RSI, MACD, Bollinger, ATR. calculate_indicators() nutzt diese Klasse.
+
+3. **Trading-Knowledge-Modul:**
+   - src/strategies/trading_knowledge.py mit Funktionen für Kerzenformationen, Marktstruktur, Support/Resistance, Trendlinien, Volatilität, psychologische Level, Strategie-Typen, Risikomanagement. Jeweils mit Docstring (Zusammenfassung, Pseudo-Code).
+
+4. **Telegram-Evaluator:**
+   - src/signals/telegram_evaluator.py mit Klasse TelegramEvaluator, Methode evaluate(raw_message). Regex-Parsing, Validierung gegen Indikator- und Knowledge-Checks, Bewertung GOOD/MEDIUM/BAD.
+
+5. **Online-Learner-Anbindung:**
+   - src/ml/online_learner.py: Methode process_trade_feedback(feedback) verarbeitet Feedback-Objekt nach jedem Trade, passt Gewichtungen an.
+
+6. **Architekturübersicht:**
+
+src/
+├─ live/
+│   └─ live_trading.py         # Live-Trading-Logik, modularisiert
+├─ strategies/
+│   ├─ xauusd_strategy.py      # Indikatorberechnung XAUUSD
+│   └─ trading_knowledge.py    # Regelbasierte Checks/Trading-Wissen
+├─ signals/
+│   └─ telegram_evaluator.py   # Telegram-Signalbewertung
+├─ ml/
+│   └─ online_learner.py       # Online-Lernmodul
+├─ mt5/
+│   └─ mt5_client.py           # MT5-Anbindung
+
+**Offene Fragen:**
+- Welche TP/SL-Standards (z.B. ATR-basiert, feste Pips) sollen im Bot bevorzugt werden?
+- Gibt es Prioritäten für die Gewichtung einzelner Checks im Online-Learner?
+- Sollen Telegram-Signale auch bei "MEDIUM" ausgeführt oder nur gemeldet werden?
+
+---
+
+**Projektbeschreibung und aktueller Stand: XAUUSD-Handelsbot (MetaTrader 5, Telegram, Online-Learning)**
+
+**Ziel:**
+Der Bot ist ein vollautomatischer Handelsbot für das Symbol XAUUSD (Gold), der auf Basis technischer Indikatoren, Trading-Grundwissen und Telegram-Signalen eigenständig Trades eröffnet und schließt. Er nutzt MetaTrader 5 als Handelsplattform, kann Telegram-Signale empfangen, bewertet diese kritisch und lernt kontinuierlich aus den Handelsergebnissen, um seine Entscheidungslogik zu verbessern.
+
+**Hauptfunktionen:**
+- Automatischer Handel von XAUUSD auf Basis von EMA, RSI, MACD, Bollinger-Bänder und ATR.
+- ATR-basierte Take-Profit/Stop-Loss-Logik: TP = 2 × ATR(14), SL = 1 × ATR(14).
+- Empfang und Bewertung von Telegram-Signalen (Parsing, Validierung, Klassifizierung).
+- Integration von Trading-Grundwissen: Marktstruktur, Kerzenformationen, Support/Resistance, Trendlinien, Volatilität, psychologische Preislevel, Strategie-Typen, Risikomanagement.
+- Online-Learning: Der Bot passt die Gewichtung seiner Entscheidungsregeln dynamisch an, basierend auf dem Erfolg/Misserfolg vergangener Trades.
+- Logging aller Trades inkl. Kategorie ("GOOD"), ATR-Werte für TP/SL und Signalherkunft.
+
+**Architektur (Dateien/Module):**
+- `src/live/live_trading.py`: Zentrale Handelslogik, modularisiert (fetch_data, calculate_indicators, evaluate_signals, execute_trade). Setzt ATR-basiertes TP/SL.
+- `src/strategies/xauusd_strategy.py`: Berechnung der Hauptindikatoren für XAUUSD.
+- `src/strategies/trading_knowledge.py`: Regelbasierte Checks für Trading-Grundwissen (je Konzept eigene Funktion mit Beschreibung und Pseudo-Code).
+- `src/signals/telegram_evaluator.py`: Bewertet Telegram-Signale, prüft ATR-TP/SL, klassifiziert alle "MEDIUM"-Signale als "GOOD".
+- `src/ml/online_learner.py`: Online-Lernmodul, verarbeitet Feedback nach jedem Trade, initiale Gewichtungen: 50% Indikator-Signale, 20% Marktstruktur, 15% Kerzenformationen, 10% Support & Resistance, 5% psychologische Preislevel.
+- `tests/test_telegram_evaluator.py`: Testet, dass ehemals "MEDIUM"-Signale als "GOOD" erkannt und mit ATR-TP/SL ausgeführt werden.
+
+**Wichtige Logik/Regeln:**
+- **ATR-TP/SL:** Bei jedem Trade werden TP und SL strikt nach ATR(14) gesetzt (TP = 2×ATR, SL = 1×ATR). Dies gilt auch für Telegram-Signale (werden geprüft und ggf. abgelehnt, wenn nicht ATR-konform).
+- **Signalbewertung:** Telegram-Signale werden geparst, gegen Indikator- und Wissens-Checks validiert. "MEDIUM"-Signale werden wie "GOOD" behandelt und automatisch ausgeführt. "BAD"-Signale werden ignoriert.
+- **Online-Learning:** Nach jedem Trade wird ein Feedback-Objekt an das Lernmodul übergeben. Die Gewichtungen der Entscheidungsregeln werden entsprechend dem Trade-Ergebnis angepasst (siehe oben).
+--- [ 2 0 2 5 - 0 6 - 1 1 ]  
+ T e s t z u g r i f f  
+ e r f o l g r e i c h  
+ 

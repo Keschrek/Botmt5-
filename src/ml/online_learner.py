@@ -10,6 +10,19 @@ import os # For creating directories
 logger = logging.getLogger(__name__)
 
 class OnlineLearner:
+    """
+    Online-Lernmodul für den XAUUSD-Bot.
+    Nach jedem Trade wird ein Feedback-Objekt verarbeitet:
+    {
+      "timestamp": "...",
+      "symbol": "XAUUSD",
+      "indicators": { ... },
+      "knowledge_checks": { ... },
+      "signal_rating": "GOOD"/"BAD",
+      "outcome": "TP"/"SL"
+    }
+    Bei TP werden positive Muster verstärkt, bei SL werden die Ursachen (Checks/Indikatoren) gewichtet und das Regelwerk angepasst.
+    """
     def __init__(self, ml_cfg: Dict[str, Any]):
         self.ml_cfg = ml_cfg
         self.model = None # Placeholder for a river model, for example
@@ -22,6 +35,15 @@ class OnlineLearner:
         # Store indicators config for feature extraction consistency
         self.indicators_cfg = ml_cfg.get('indicators', {})
         self.timezone = ml_cfg.get('timezone', 'UTC') # Get timezone from config for time features
+        self.memory = []
+        # Initiale Gewichtungen
+        self.pattern_weights = {
+            'indicators': 0.5,
+            'market_structure': 0.2,
+            'candlestick_patterns': 0.15,
+            'support_resistance': 0.1,
+            'psychological_levels': 0.05
+        }
 
         # Attempt to load the model if it exists
         if Path(self.model_path).exists():
@@ -94,73 +116,31 @@ class OnlineLearner:
             self.metric_f1 = None
             self.metric_logloss = None
 
-    def process_trade_feedback(self, trade_data: Dict[str, Any]):
-        """Processes feedback from a completed trade (e.g., P/L, outcome) to update the model."""
-        logger.info(f"Processing trade feedback for trade: {trade_data.get('comment', 'N/A')}")
-
-        if self.model is None:
-             logger.warning("Cannot process trade feedback: Online learning model not initialized.")
-             return
-
-        try:
-            # Extract features and target from trade_data
-            # Assumes trade_data contains necessary information, including potentially the bar data at entry.
-            features = self.extract_features(trade_data)
-            target = self.extract_target(trade_data) # e.g., 1 for win, 0 for loss
-
-            if features is None or target is None:
-                 logger.warning("Skipping trade feedback processing: Could not extract features or target.")
-                 return
-
-            # Update the online learning model
-            # river models learn one sample at a time
-            xf, y = features, target # Use river's convention for features (x) and target (y)
-            
-            # Make a prediction BEFORE learning to evaluate the model's performance on this sample
-            y_pred = None
-            y_prob = None
-            try:
-                y_pred = self.model.predict_one(xf) # Predicted class (0 or 1)
-                # Try to get probabilities if the model supports it (e.g., LogisticRegression)
-                try:
-                     y_prob = self.model.predict_proba_one(xf)
-                except Exception as prob_e:
-                     logger.debug(f"Model does not support predict_proba_one or failed: {prob_e}")
-                     # y_prob remains None
-
-                # Update metrics
-                if self.metric:
-                    self.metric.update(y, y_pred) # Update Accuracy
-                    logger.debug(f"Accuracy updated: {self.metric.get()}")
-                if self.metric_f1:
-                     self.metric_f1.update(y, y_pred) # Update F1 Score
-                     logger.debug(f"F1 Score updated: {self.metric_f1.get()}")
-                if self.metric_logloss and y_prob is not None:
-                     # LogLoss requires probabilities. Need probability of the true class y.
-                     # The probabilities dict is like {class_value: probability}
-                     true_class_prob = y_prob.get(y)
-                     if true_class_prob is not None:
-                          self.metric_logloss.update(y, y_prob) # Update LogLoss
-                          logger.debug(f"LogLoss updated: {self.metric_logloss.get():.4f}")
-                     else:
-                          logger.warning(f"Could not get probability for true class {y} for LogLoss update.")
-
-            except Exception as pred_e:
-                 logger.warning(f"Prediction or metric update failed: {pred_e}. This might happen early in training.")
-                 y_pred = None # Indicate prediction failed
-                 y_prob = None # Indicate probabilities failed
-
-            self.model.learn_one(xf, y) # Learn from the feedback
-            logger.debug(f"Model learned one sample. Target: {y}, Predicted (before learning): {y_pred}")
-
-            self._update_count += 1
-            # Save model periodically
-            if self._update_count % self.model_save_interval == 0:
-                 self.save_model(self.model_path)
-                 self._update_count = 0 # Reset counter after saving
-
-        except Exception as e:
-            logger.error(f"Error processing trade feedback: {e}")
+    def process_trade_feedback(self, feedback: dict):
+        self.memory.append(feedback)
+        # Gewichtete Anpassung
+        if feedback["outcome"] == "TP":
+            for k, v in feedback["indicators"].items():
+                self.pattern_weights['indicators'] += 0.5 if v else 0
+            if feedback["knowledge_checks"].get('market_structure'):
+                self.pattern_weights['market_structure'] += 0.2
+            if feedback["knowledge_checks"].get('candlestick_patterns'):
+                self.pattern_weights['candlestick_patterns'] += 0.15
+            if feedback["knowledge_checks"].get('support_resistance'):
+                self.pattern_weights['support_resistance'] += 0.1
+            if feedback["knowledge_checks"].get('psychological_levels'):
+                self.pattern_weights['psychological_levels'] += 0.05
+        elif feedback["outcome"] == "SL":
+            for k, v in feedback["indicators"].items():
+                self.pattern_weights['indicators'] -= 0.5 if not v else 0
+            if not feedback["knowledge_checks"].get('market_structure'):
+                self.pattern_weights['market_structure'] -= 0.2
+            if not feedback["knowledge_checks"].get('candlestick_patterns'):
+                self.pattern_weights['candlestick_patterns'] -= 0.15
+            if not feedback["knowledge_checks"].get('support_resistance'):
+                self.pattern_weights['support_resistance'] -= 0.1
+            if not feedback["knowledge_checks"].get('psychological_levels'):
+                self.pattern_weights['psychological_levels'] -= 0.05
 
     def extract_features(self, trade_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Helper method to extract features from trade data for the ML model training."""
